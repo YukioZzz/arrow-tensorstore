@@ -34,15 +34,18 @@ import socket
 import warnings
 
 import pyarrow
+from pyarrow import cuda
 from pyarrow.lib cimport (Buffer, NativeFile, _Weakrefable,
                           check_status, pyarrow_wrap_buffer)
 from pyarrow.lib import ArrowException, frombytes
+from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport (CBuffer, CMutableBuffer,
                                         CFixedSizeBufferWriter, CStatus)
-from pyarrow.includes.libplasma cimport *
+from pyarrow.includes.libarrow_cuda cimport CCudaBuffer
+from pyarrow.includes.libplasma cimport*
+from pyarrow cimport _cuda
 
 PLASMA_WAIT_TIMEOUT = 2 ** 30
-
 
 cdef extern from "plasma/common.h" nogil:
     cdef cppclass CCudaIpcPlaceholder" plasma::internal::CudaIpcPlaceholder":
@@ -102,7 +105,7 @@ cdef extern from "plasma/client.h" nogil:
 
         CStatus Create(const CUniqueID& object_id,
                        int64_t data_size, const uint8_t* metadata, int64_t
-                       metadata_size, const shared_ptr[CBuffer]* data)
+                       metadata_size, const shared_ptr[CBuffer]* data, int64_t device_num)
 
         CStatus CreateAndSeal(const CUniqueID& object_id,
                               const c_string& data, const c_string& metadata)
@@ -269,7 +272,6 @@ cdef class PlasmaBuffer(Buffer):
         """
         self.client._release(self.object_id)
 
-
 class PlasmaObjectNotFound(ArrowException):
     pass
 
@@ -352,7 +354,7 @@ cdef class PlasmaClient(_Weakrefable):
         return self.store_socket_name.decode()
 
     def create(self, ObjectID object_id, int64_t data_size,
-               c_string metadata=b""):
+               c_string metadata=b"", int64_t device_num=0):
         """
         Create a new buffer in the PlasmaStore for a particular object ID.
 
@@ -389,10 +391,14 @@ cdef class PlasmaClient(_Weakrefable):
             plasma_check_status(
                 self.client.get().Create(object_id.data, data_size,
                                          <uint8_t*>(metadata.data()),
-                                         metadata.size(), &data))
-        return self._make_mutable_plasma_buffer(object_id,
-                                                data.get().mutable_data(),
-                                                data_size)
+                                         metadata.size(), &data, device_num))
+        if device_num != 0:
+            buff = _cuda.pyarrow_wrap_cudabuffer(GetResultValue(CCudaBuffer.FromBuffer(data)))
+            return buff
+        else:
+            return self._make_mutable_plasma_buffer(object_id,
+                                                    data.get().mutable_data(),
+                                                    data_size)
 
     def create_and_seal(self, ObjectID object_id, c_string data,
                         c_string metadata=b""):
@@ -424,7 +430,7 @@ cdef class PlasmaClient(_Weakrefable):
                 self.client.get().CreateAndSeal(object_id.data, data,
                                                 metadata))
 
-    def get_buffers(self, object_ids, timeout_ms=-1, with_meta=False):
+    def get_buffers(self, object_ids, timeout_ms=-1, with_meta=False, device_num = 0):
         """
         Returns data buffer from the PlasmaStore based on object ID.
 
@@ -454,7 +460,11 @@ cdef class PlasmaClient(_Weakrefable):
         result = []
         for i in range(object_buffers.size()):
             if object_buffers[i].data.get() != nullptr:
-                data = pyarrow_wrap_buffer(object_buffers[i].data)
+                if device_num != 0:
+                  data = pyarrow_wrap_buffer(object_buffers[i].data)
+                  #data = _cuda.pyarrow_wrap_cudabuffer(GetResultValue(CCudaBuffer.FromBuffer(object_buffers[i].data))) # It has some problem here
+                else:
+                  data = pyarrow_wrap_buffer(object_buffers[i].data)
             else:
                 data = None
             if not with_meta:
@@ -501,7 +511,7 @@ cdef class PlasmaClient(_Weakrefable):
         return result
 
     def put_raw_buffer(self, object value, ObjectID object_id=None,
-                       c_string metadata=b"", int memcopy_threads=6):
+                       c_string metadata=b"", int memcopy_threads=6, device_num=0):
         """
         Store Python buffer into the object store.
 
@@ -527,15 +537,18 @@ cdef class PlasmaClient(_Weakrefable):
         cdef ObjectID target_id = (object_id if object_id
                                    else ObjectID.from_random())
         cdef Buffer arrow_buffer = pyarrow.py_buffer(value)
-        write_buffer = self.create(target_id, len(value), metadata)
-        stream = pyarrow.FixedSizeBufferWriter(write_buffer)
-        stream.set_memcopy_threads(memcopy_threads)
+        write_buffer = self.create(target_id, len(value), metadata, device_num)
+        if device_num != 0:
+            stream = cuda.BufferWriter(write_buffer)
+        else:
+            stream = pyarrow.FixedSizeBufferWriter(write_buffer)
+            stream.set_memcopy_threads(memcopy_threads)
         stream.write(arrow_buffer)
         self.seal(target_id)
         return target_id
 
     def put(self, object value, ObjectID object_id=None, int memcopy_threads=6,
-            serialization_context=None):
+            serialization_context=None, device_num=0):
         """
         Store a Python value into the object store.
 
@@ -557,6 +570,9 @@ cdef class PlasmaClient(_Weakrefable):
         ObjectID
             The object ID associated to the Python object.
         """
+        if device_num != 0:
+            return self.put_raw_buffer(value, object_id, b"", memcopy_threads, device_num)
+
         cdef ObjectID target_id = (object_id if object_id
                                    else ObjectID.from_random())
         if serialization_context is not None:
@@ -573,7 +589,7 @@ cdef class PlasmaClient(_Weakrefable):
         self.seal(target_id)
         return target_id
 
-    def get(self, object_ids, int timeout_ms=-1, serialization_context=None):
+    def get(self, object_ids, int timeout_ms=-1, serialization_context=None, device_num = 0):
         """
         Get one or more Python values from the object store.
 
@@ -604,19 +620,23 @@ cdef class PlasmaClient(_Weakrefable):
             )
         if isinstance(object_ids, Sequence):
             results = []
-            buffers = self.get_buffers(object_ids, timeout_ms)
+            buffers = self.get_buffers(object_ids, timeout_ms, device_num=device_num)
+            print("yohu")
             for i in range(len(object_ids)):
                 # buffers[i] is None if this object was not available within
                 # the timeout
                 if buffers[i]:
-                    val = pyarrow.lib._deserialize(buffers[i],
+                    if device_num == 0:
+                        val = pyarrow.lib._deserialize(buffers[i],
                                                    serialization_context)
-                    results.append(val)
+                        results.append(val)
+                    else:
+                        results.append(buffers[i])
                 else:
                     results.append(ObjectNotAvailable)
             return results
         else:
-            return self.get([object_ids], timeout_ms, serialization_context)[0]
+            return self.get([object_ids], timeout_ms, serialization_context, device_num=device_num)[0]
 
     def seal(self, ObjectID object_id):
         """

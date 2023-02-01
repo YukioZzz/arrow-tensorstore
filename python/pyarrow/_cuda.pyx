@@ -396,6 +396,7 @@ cdef class CudaBuffer(Buffer):
                         object base):
         self.cuda_buffer = buffer
         self.init(<shared_ptr[CBuffer]> buffer)
+        print("use count:", buffer.use_count())
         self.base = base
 
     @staticmethod
@@ -644,8 +645,10 @@ cdef class CudaBuffer(Buffer):
 
         """
         cdef shared_ptr[CCudaIpcMemHandle] handle
+        print("getting handle now")
         with nogil:
             handle = GetResultValue(self.cuda_buffer.get().ExportForIpc())
+        print("wrap now")
         return pyarrow_wrap_cudaipcmemhandle(handle)
 
     @property
@@ -1048,7 +1051,9 @@ cdef public api bint pyarrow_is_cudaipcmemhandle(object handle):
 cdef public api object \
         pyarrow_wrap_cudaipcmemhandle(shared_ptr[CCudaIpcMemHandle]& h):
     cdef IpcMemHandle result = IpcMemHandle.__new__(IpcMemHandle)
+    print("initing")
     result.init(h)
+    print("inited")
     return result
 
 

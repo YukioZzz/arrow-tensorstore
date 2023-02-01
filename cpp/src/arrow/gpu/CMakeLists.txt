@@ -32,7 +32,8 @@ endif()
 set(ARROW_CUDA_LINK_LIBS arrow::flatbuffers)
 if(CMAKE_VERSION VERSION_LESS 3.17)
   find_package(CUDA REQUIRED)
-  set(ARROW_CUDA_SHARED_LINK_LIBS ${CUDA_CUDA_LIBRARY})
+  set(ARROW_CUDA_SHARED_LINK_LIBS ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARY})
+  #message(STATUS "Include directories: ${CUDA_INCLUDE_DIRS}")
   include_directories(SYSTEM ${CUDA_INCLUDE_DIRS})
 else()
   # find_package(CUDA) is deprecated, and for newer CUDA, it doesn't
@@ -69,7 +70,6 @@ add_arrow_lib(arrow_cuda
               Arrow::arrow_static
               ${ARROW_CUDA_SHARED_LINK_LIBS})
 
-add_dependencies(arrow_cuda ${ARROW_CUDA_LIBRARIES})
 
 foreach(LIB_TARGET ${ARROW_CUDA_LIBRARIES})
   target_compile_definitions(${LIB_TARGET} PRIVATE ARROW_EXPORTING)

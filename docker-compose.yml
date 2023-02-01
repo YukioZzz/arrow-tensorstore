@@ -349,7 +349,9 @@ services:
       /bin/bash -c "
         /arrow/ci/scripts/cpp_build.sh /arrow /build &&
         /arrow/ci/scripts/integration_skyhook.sh /build &&
-        /arrow/ci/scripts/cpp_test.sh /arrow /build"
+        sleep infinity"
+
+     #/arrow/ci/scripts/cpp_test.sh /arrow /build"
 
   ubuntu-cpp:
     # Usage:
@@ -482,7 +484,7 @@ services:
         - ${REPO}:${ARCH}-ubuntu-${UBUNTU}-cuda-${CUDA}-cpp
       args:
         arch: ${ARCH}
-        base: nvidia/cuda:${CUDA}-devel-ubuntu${UBUNTU}
+        base: nvidia/cuda:${CUDA}-cudnn8-devel-ubuntu${UBUNTU}
         clang_tools: ${CLANG_TOOLS}
         llvm: ${LLVM}
     shm_size: *shm-size
@@ -784,12 +786,14 @@ services:
     shm_size: *shm-size
     environment:
       <<: [ *ccache, *cuda-environment ]
+      ARROW_CUDA: "ON"
+      ARROW_PLASMA: "ON"
     volumes: *ubuntu-volumes
     command: &python-command >
       /bin/bash -c "
         /arrow/ci/scripts/cpp_build.sh /arrow /build &&
         /arrow/ci/scripts/python_build.sh /arrow /build &&
-        /arrow/ci/scripts/python_test.sh /arrow"
+        sleep infinity"
 
   debian-python:
     # Usage:

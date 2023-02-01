@@ -26,6 +26,7 @@
 
 #ifdef PLASMA_CUDA
 #include "arrow/gpu/cuda_api.h"
+#include <iostream>
 #endif
 #include "arrow/util/ubsan.h"
 
@@ -215,11 +216,14 @@ Status SendCreateReply(int sock, ObjectID object_id, PlasmaObject* object,
   auto object_string = fbb.CreateString(object_id.binary());
 #ifdef PLASMA_CUDA
   flatbuffers::Offset<fb::CudaHandle> ipc_handle;
+  ARROW_LOG(INFO) << "tackle ipc handle";
   if (object->device_num != 0) {
     std::shared_ptr<arrow::Buffer> handle;
     ARROW_ASSIGN_OR_RAISE(handle, object->ipc_handle->Serialize());
+    ARROW_LOG(INFO) << "ipc handle creating";
     ipc_handle =
         fb::CreateCudaHandle(fbb, fbb.CreateVector(handle->data(), handle->size()));
+    ARROW_LOG(INFO) << "handle created";
   }
 #endif
   fb::PlasmaCreateReplyBuilder crb(fbb);
@@ -230,7 +234,9 @@ Status SendCreateReply(int sock, ObjectID object_id, PlasmaObject* object,
   crb.add_mmap_size(mmap_size);
   if (object->device_num != 0) {
 #ifdef PLASMA_CUDA
+    ARROW_LOG(INFO) << "handle adding";
     crb.add_ipc_handle(ipc_handle);
+    ARROW_LOG(INFO) << "handle added";
 #else
     ARROW_LOG(FATAL) << "This should be unreachable.";
 #endif
@@ -727,6 +733,7 @@ Status ReadGetReply(const uint8_t* data, size_t size, ObjectID object_ids[],
 #ifdef PLASMA_CUDA
     if (object->device_num() != 0) {
       const void* ipc_handle = message->handles()->Get(handle_pos)->handle()->data();
+      ARROW_LOG(INFO)<<"Get ipc_handle from server, opening it now and save it to object handle.";
       ARROW_ASSIGN_OR_RAISE(plasma_objects[i].ipc_handle,
                             CudaIpcMemHandle::FromBuffer(ipc_handle));
       handle_pos++;

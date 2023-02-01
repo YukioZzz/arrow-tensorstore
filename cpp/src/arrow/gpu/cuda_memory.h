@@ -141,11 +141,12 @@ class ARROW_EXPORT CudaIpcMemHandle {
   struct CudaIpcMemHandleImpl;
   std::unique_ptr<CudaIpcMemHandleImpl> impl_;
 
-  const void* handle() const;
-  int64_t memory_size() const;
 
   friend CudaBuffer;
   friend CudaContext;
+ public:
+  const void* handle() const;
+  int64_t memory_size() const;
 };
 
 /// \class CudaBufferReader

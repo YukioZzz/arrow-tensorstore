@@ -47,6 +47,9 @@ cdef extern from "arrow/gpu/cuda_api.h" namespace "arrow::cuda" nogil:
         CResult[shared_ptr[CCudaIpcMemHandle]] FromBuffer(
             const void* opaque_handle)
         CResult[shared_ptr[CBuffer]] Serialize(CMemoryPool* pool) const
+        void* handle() const 
+        int64_t memory_size() const
+
 
     cdef cppclass CCudaBuffer" arrow::cuda::CudaBuffer"(CBuffer):
         CCudaBuffer(uint8_t* data, int64_t size,

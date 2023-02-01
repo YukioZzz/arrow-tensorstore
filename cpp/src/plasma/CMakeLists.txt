@@ -25,6 +25,7 @@ add_dependencies(plasma-all plasma plasma-tests plasma-benchmarks)
 set(PLASMA_VERSION "${ARROW_VERSION}")
 
 find_package(Threads)
+find_package(CUDA REQUIRED)
 
 # The SO version is also the ABI version
 set(PLASMA_SO_VERSION "${ARROW_SO_VERSION}")
@@ -126,11 +127,12 @@ list(APPEND PLASMA_EXTERNAL_STORE_SOURCES "external_store.cc" "hash_table_store.
 # We use static libraries for the plasma-store-server executable so that it can
 # be copied around and used in different locations.
 add_executable(plasma-store-server ${PLASMA_EXTERNAL_STORE_SOURCES} ${PLASMA_STORE_SRCS})
+target_link_directories(plasma-store-server PUBLIC /usr/local/cuda/lib64)
 if(ARROW_BUILD_STATIC)
   target_link_libraries(plasma-store-server plasma_static ${PLASMA_STATIC_LINK_LIBS})
 else()
   # Fallback to shared libs in the case that static libraries are not build.
-  target_link_libraries(plasma-store-server plasma_shared ${PLASMA_LINK_LIBS})
+  target_link_libraries(plasma-store-server plasma_shared ${PLASMA_LINK_LIBS} cudart)
 endif()
 target_link_libraries(plasma-store-server ${GFLAGS_LIBRARIES})
 target_compile_definitions(plasma-store-server PRIVATE _PLASMA_NO_DEPRECATE)
@@ -212,3 +214,4 @@ add_plasma_test(test/external_store_tests
                 ${PLASMA_TEST_LIBS}
                 EXTRA_DEPENDENCIES
                 plasma-store-server)
+add_plasma_test(test/simpledemo EXTRA_LINK_LIBS ${PLASMA_TEST_LIBS})

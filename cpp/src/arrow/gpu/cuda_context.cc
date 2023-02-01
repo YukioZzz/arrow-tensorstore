@@ -25,8 +25,10 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <iostream>
 
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 
 #include "arrow/gpu/cuda_internal.h"
 #include "arrow/gpu/cuda_memory.h"
@@ -111,8 +113,9 @@ class CudaContext::Impl {
   Status Allocate(int64_t nbytes, uint8_t** out) {
     if (nbytes > 0) {
       ContextSaver set_temporary(context_);
-      CUdeviceptr data;
-      CU_RETURN_NOT_OK("cuMemAlloc", cuMemAlloc(&data, static_cast<size_t>(nbytes)));
+      float* data;
+      //CU_RETURN_NOT_OK("cuMemAlloc", cuMemAlloc(&data, static_cast<size_t>(nbytes)));
+      cudaMalloc((void **)&data, static_cast<size_t>(nbytes));
       bytes_allocated_ += nbytes;
       *out = reinterpret_cast<uint8_t*>(data);
     } else {
@@ -155,6 +158,7 @@ class CudaContext::Impl {
   }
 
   Status Free(void* device_ptr, int64_t nbytes) {
+    std::cout<<"dev ptr freed!:"<<reinterpret_cast<uint64_t>(device_ptr)<<std::endl;
     CU_RETURN_NOT_OK("cuMemFree", cuMemFree(reinterpret_cast<CUdeviceptr>(device_ptr)));
     bytes_allocated_ -= nbytes;
     return Status::OK();
@@ -162,12 +166,14 @@ class CudaContext::Impl {
 
   Result<std::shared_ptr<CudaIpcMemHandle>> ExportIpcBuffer(const void* data,
                                                             int64_t size) {
-    CUipcMemHandle cu_handle;
+    cudaIpcMemHandle_t cu_handle;
+    //CUipcMemHandle cu_handle;
     if (size > 0) {
       ContextSaver set_temporary(context_);
-      CU_RETURN_NOT_OK(
-          "cuIpcGetMemHandle",
-          cuIpcGetMemHandle(&cu_handle, reinterpret_cast<CUdeviceptr>(data)));
+      //CU_RETURN_NOT_OK(
+          //"cuIpcGetMemHandle",
+          //cuIpcGetMemHandle(&cu_handle, reinterpret_cast<CUdeviceptr>(data)));
+          cudaIpcGetMemHandle(&cu_handle, const_cast<void*>(data));
     }
     return std::shared_ptr<CudaIpcMemHandle>(new CudaIpcMemHandle(size, &cu_handle));
   }
@@ -175,11 +181,21 @@ class CudaContext::Impl {
   Status OpenIpcBuffer(const CudaIpcMemHandle& ipc_handle, uint8_t** out) {
     int64_t size = ipc_handle.memory_size();
     if (size > 0) {
-      auto handle = reinterpret_cast<const CUipcMemHandle*>(ipc_handle.handle());
-      CUdeviceptr data;
-      CU_RETURN_NOT_OK(
-          "cuIpcOpenMemHandle",
-          cuIpcOpenMemHandle(&data, *handle, CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS));
+      auto handle = reinterpret_cast<const cudaIpcMemHandle_t*>(ipc_handle.handle());
+      void* data;
+      auto err = cudaIpcOpenMemHandle(&data, *handle, cudaIpcMemLazyEnablePeerAccess);
+      if (err != cudaSuccess) {
+        fprintf(stderr, "Failed at cudaIpcOpenMemHandle with err %s\n", cudaGetErrorString(err));
+	*out=nullptr;
+      }else{
+        printf("cudaIPCOpenMemHandle success!");
+      }
+
+      //auto handle = reinterpret_cast<const CUipcMemHandle*>(ipc_handle.handle());
+      //CUdeviceptr data;
+      //CU_RETURN_NOT_OK(
+      //    "cuIpcOpenMemHandle",
+          //cuIpcOpenMemHandle(&data, *handle, CU_IPC_MEM_LAZY_ENABLE_PEER_ACCESS));
       *out = reinterpret_cast<uint8_t*>(data);
     } else {
       *out = nullptr;
@@ -610,6 +626,21 @@ Result<std::shared_ptr<CudaBuffer>> CudaContext::OpenIpcBuffer(
     CU_RETURN_NOT_OK("cuMemGetAddressRange",
                      cuMemGetAddressRange(nullptr, &allocation_size,
                                           reinterpret_cast<CUdeviceptr>(data)));
+    printf("allocation size: %ld\n",allocation_size);
+
+  cudaPointerAttributes attributes;
+  auto err = cudaPointerGetAttributes(&attributes, reinterpret_cast<void*>(data));
+    if (err != cudaSuccess) {
+      fprintf(stderr, "Failed at get attri with err %s\n",  cudaGetErrorString(err));
+      exit(1);
+  }
+    printf("ptr device at open ipc buffer:%d with ptr %ld\n",attributes.type, reinterpret_cast<uint64_t>(data));
+//    uint32_t buff[1000];
+//    cudaMemcpy(reinterpret_cast<void*>(buff), reinterpret_cast<void*>(data), 1000 * sizeof(uint32_t), cudaMemcpyDeviceToHost);
+//  std::cout<<"check first 1000 value:"<<std::endl;
+//  for(int i=0;i<1000;i++){
+//    std::cout<<buff[i]<<" ";
+//  }
     return std::make_shared<CudaBuffer>(data, allocation_size, this->shared_from_this(),
                                         true, true);
   } else {
@@ -622,7 +653,9 @@ Result<std::shared_ptr<CudaBuffer>> CudaContext::OpenIpcBuffer(
 
 Status CudaContext::CloseIpcBuffer(CudaBuffer* buf) {
   ContextSaver set_temporary(*this);
-  CU_RETURN_NOT_OK("cuIpcCloseMemHandle", cuIpcCloseMemHandle(buf->address()));
+  //CU_RETURN_NOT_OK("cuIpcCloseMemHandle", cuIpcCloseMemHandle(buf->address()));
+  std::cout<<"CudaIPC handle closed at ptr:"<<reinterpret_cast<uint64_t>(buf->address())<<std::endl;
+  cudaIpcCloseMemHandle(reinterpret_cast<void*>(buf->address()));
   return Status::OK();
 }
 

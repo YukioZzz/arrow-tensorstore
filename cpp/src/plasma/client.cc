@@ -56,6 +56,7 @@
 
 #ifdef PLASMA_CUDA
 #include "arrow/gpu/cuda_api.h"
+#include <iostream>
 
 using arrow::cuda::CudaBuffer;
 using arrow::cuda::CudaBufferWriter;
@@ -420,7 +421,7 @@ Status PlasmaClient::Impl::Create(const ObjectID& object_id, int64_t data_size,
                                   bool evict_if_full) {
   std::lock_guard<std::recursive_mutex> guard(client_mutex_);
 
-  ARROW_LOG(DEBUG) << "called plasma_create on conn " << store_conn_ << " with size "
+  ARROW_LOG(INFO) << "called plasma_create on conn " << store_conn_ << " with size "
                    << data_size << " and metadata size " << metadata_size;
   RETURN_NOT_OK(SendCreateRequest(store_conn_, object_id, evict_if_full, data_size,
                                   metadata_size, device_num));
@@ -460,7 +461,7 @@ Status PlasmaClient::Impl::Create(const ObjectID& object_id, int64_t data_size,
       std::lock_guard<std::mutex> lock(gpu_mutex);
       gpu_object_map[object_id] = handle;
     }
-    if (metadata != NULL) {
+    if (metadata_size != 0) {
       // Copy the metadata to the buffer.
       CudaBufferWriter writer(handle->ptr);
       RETURN_NOT_OK(writer.WriteAt(object.data_size, metadata, metadata_size));
@@ -637,12 +638,14 @@ Status PlasmaClient::Impl::GetBuffers(
         auto iter = gpu_object_map.find(object_ids[i]);
         if (iter == gpu_object_map.end()) {
           ARROW_ASSIGN_OR_RAISE(auto context, GetCudaContext(object->device_num));
+	  ARROW_LOG(INFO)<<"Not found at the current process, creating object buffer based on its ipc handle";
           GpuProcessHandle* obj_handle = new GpuProcessHandle();
           obj_handle->client_count = 1;
           ARROW_ASSIGN_OR_RAISE(obj_handle->ptr,
                                 context->OpenIpcBuffer(*object->ipc_handle));
           gpu_object_map[object_ids[i]] = obj_handle;
           physical_buf = MakeBufferFromGpuProcessHandle(obj_handle);
+	  ARROW_LOG(INFO)<<"pysical_buf created";
         } else {
           iter->second->client_count++;
           physical_buf = MakeBufferFromGpuProcessHandle(iter->second);
@@ -660,6 +663,7 @@ Status PlasmaClient::Impl::GetBuffers(
       // Increment the count of the number of instances of this object that this
       // client is using. Cache the reference to the object.
       IncrementObjectCount(received_object_ids[i], object, true);
+      ARROW_LOG(INFO)<<"All fields filled";
     } else {
       // The object was not retrieved.  The caller can detect this condition
       // by checking the boolean value of the metadata/data buffers.

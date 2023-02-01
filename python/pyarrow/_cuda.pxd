@@ -22,6 +22,8 @@ from pyarrow.includes.common cimport *
 from pyarrow.includes.libarrow cimport *
 from pyarrow.includes.libarrow_cuda cimport *
 
+cdef public api object \
+        pyarrow_wrap_cudabuffer(const shared_ptr[CCudaBuffer]& buf)
 
 cdef class Context(_Weakrefable):
     cdef:

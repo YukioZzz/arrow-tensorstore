@@ -948,15 +948,19 @@ Status PlasmaStore::ProcessMessage(Client* client) {
       int device_num;
       RETURN_NOT_OK(ReadCreateRequest(input, input_size, &object_id, &evict_if_full,
                                       &data_size, &metadata_size, &device_num));
+      ARROW_LOG(INFO) << "Request Read successfully!";
       PlasmaError error_code = CreateObject(object_id, evict_if_full, data_size,
                                             metadata_size, device_num, client, &object);
+      ARROW_LOG(INFO) << "Object created successfully!";
       int64_t mmap_size = 0;
       if (error_code == PlasmaError::OK && device_num == 0) {
         mmap_size = GetMmapSize(object.store_fd);
       }
+      ARROW_LOG(INFO) << "Sending Create Reply from Server!";
       HANDLE_SIGPIPE(
           SendCreateReply(client->fd, object_id, &object, error_code, mmap_size),
           client->fd);
+      ARROW_LOG(INFO) << "Create Reply Sent from Server!";
       // Only send the file descriptor if it hasn't been sent (see analogous
       // logic in GetStoreFd in client.cc). Similar in ReturnFromGet.
       if (error_code == PlasmaError::OK && device_num == 0 &&
