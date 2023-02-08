@@ -185,10 +185,8 @@ class CudaContext::Impl {
       void* data;
       auto err = cudaIpcOpenMemHandle(&data, *handle, cudaIpcMemLazyEnablePeerAccess);
       if (err != cudaSuccess) {
-        fprintf(stderr, "Failed at cudaIpcOpenMemHandle with err %s\n", cudaGetErrorString(err));
 	*out=nullptr;
       }else{
-        printf("cudaIPCOpenMemHandle success!");
       }
 
       //auto handle = reinterpret_cast<const CUipcMemHandle*>(ipc_handle.handle());
@@ -626,7 +624,6 @@ Result<std::shared_ptr<CudaBuffer>> CudaContext::OpenIpcBuffer(
     CU_RETURN_NOT_OK("cuMemGetAddressRange",
                      cuMemGetAddressRange(nullptr, &allocation_size,
                                           reinterpret_cast<CUdeviceptr>(data)));
-    printf("allocation size: %ld\n",allocation_size);
 
   cudaPointerAttributes attributes;
   auto err = cudaPointerGetAttributes(&attributes, reinterpret_cast<void*>(data));
@@ -634,7 +631,6 @@ Result<std::shared_ptr<CudaBuffer>> CudaContext::OpenIpcBuffer(
       fprintf(stderr, "Failed at get attri with err %s\n",  cudaGetErrorString(err));
       exit(1);
   }
-    printf("ptr device at open ipc buffer:%d with ptr %ld\n",attributes.type, reinterpret_cast<uint64_t>(data));
 //    uint32_t buff[1000];
 //    cudaMemcpy(reinterpret_cast<void*>(buff), reinterpret_cast<void*>(data), 1000 * sizeof(uint32_t), cudaMemcpyDeviceToHost);
 //  std::cout<<"check first 1000 value:"<<std::endl;

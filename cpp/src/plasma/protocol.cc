@@ -733,7 +733,7 @@ Status ReadGetReply(const uint8_t* data, size_t size, ObjectID object_ids[],
 #ifdef PLASMA_CUDA
     if (object->device_num() != 0) {
       const void* ipc_handle = message->handles()->Get(handle_pos)->handle()->data();
-      ARROW_LOG(INFO)<<"Get ipc_handle from server, opening it now and save it to object handle.";
+      ARROW_LOG(DEBUG)<<"Get ipc_handle from server, opening it now and save it to object handle.";
       ARROW_ASSIGN_OR_RAISE(plasma_objects[i].ipc_handle,
                             CudaIpcMemHandle::FromBuffer(ipc_handle));
       handle_pos++;

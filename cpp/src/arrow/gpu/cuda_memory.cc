@@ -116,7 +116,7 @@ CudaBuffer::CudaBuffer(uintptr_t address, int64_t size,
                        bool is_ipc)
     : CudaBuffer(reinterpret_cast<uint8_t*>(address), size, context, own_data, is_ipc) {}
 
-CudaBuffer::~CudaBuffer() { std::cout<<"Destructing the cuda buffer\n";ARROW_CHECK_OK(Close()); }
+CudaBuffer::~CudaBuffer() { ARROW_CHECK_OK(Close()); }
 
 Status CudaBuffer::Close() {
   if (own_data_) {

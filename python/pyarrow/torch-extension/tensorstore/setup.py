@@ -5,4 +5,6 @@ setup(name='tensorstore_helper',
       ext_modules=[cpp_extension.CUDAExtension('tensorstore_helper',
                       ['tensorstore_helper.cc'])],
       cmdclass={'build_ext': cpp_extension.BuildExtension})
-
+setup(name='tensorstore',
+      packages=['tensorstore'],
+      )

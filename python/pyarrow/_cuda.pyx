@@ -396,7 +396,6 @@ cdef class CudaBuffer(Buffer):
                         object base):
         self.cuda_buffer = buffer
         self.init(<shared_ptr[CBuffer]> buffer)
-        print("use count:", buffer.use_count())
         self.base = base
 
     @staticmethod

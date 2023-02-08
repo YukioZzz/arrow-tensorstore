@@ -621,7 +621,6 @@ cdef class PlasmaClient(_Weakrefable):
         if isinstance(object_ids, Sequence):
             results = []
             buffers = self.get_buffers(object_ids, timeout_ms, device_num=device_num)
-            print("yohu")
             for i in range(len(object_ids)):
                 # buffers[i] is None if this object was not available within
                 # the timeout
