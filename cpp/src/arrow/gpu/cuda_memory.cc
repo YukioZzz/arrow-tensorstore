@@ -26,7 +26,6 @@
 #include <iostream>
 
 #include <cuda.h>
-#include <cuda_runtime_api.h>
 
 #include "arrow/buffer.h"
 #include "arrow/io/memory.h"
@@ -49,20 +48,17 @@ struct CudaIpcMemHandle::CudaIpcMemHandleImpl {
   explicit CudaIpcMemHandleImpl(const uint8_t* handle) {
     memcpy(&memory_size, handle, sizeof(memory_size));
     if (memory_size != 0)
-      memcpy(&ipc_handle, handle + sizeof(memory_size), sizeof(cudaIpcMemHandle_t));
-      //memcpy(&ipc_handle, handle + sizeof(memory_size), sizeof(CUipcMemHandle));
+      memcpy(&ipc_handle, handle + sizeof(memory_size), sizeof(CUipcMemHandle));
   }
 
   explicit CudaIpcMemHandleImpl(int64_t memory_size, const void* cu_handle)
       : memory_size(memory_size) {
     if (memory_size != 0) {
-      memcpy(&ipc_handle, cu_handle, sizeof(cudaIpcMemHandle_t));
-      //memcpy(&ipc_handle, cu_handle, sizeof(CUipcMemHandle));
+      memcpy(&ipc_handle, cu_handle, sizeof(CUipcMemHandle));
     }
   }
 
-  cudaIpcMemHandle_t ipc_handle;  /// initialized only when memory_size != 0
-  //CUipcMemHandle ipc_handle;  /// initialized only when memory_size != 0
+  CUipcMemHandle ipc_handle;  /// initialized only when memory_size != 0
   int64_t memory_size;        /// size of the memory that ipc_handle refers to
 };
 
@@ -84,8 +80,7 @@ Result<std::shared_ptr<CudaIpcMemHandle>> CudaIpcMemHandle::FromBuffer(
 Result<std::shared_ptr<Buffer>> CudaIpcMemHandle::Serialize(MemoryPool* pool) const {
   int64_t size = impl_->memory_size;
   const size_t handle_size =
-      (size > 0 ? sizeof(int64_t) + sizeof(cudaIpcMemHandle_t) : sizeof(int64_t));
-      //(size > 0 ? sizeof(int64_t) + sizeof(CUipcMemHandle) : sizeof(int64_t));
+      (size > 0 ? sizeof(int64_t) + sizeof(CUipcMemHandle) : sizeof(int64_t));
 
   ARROW_ASSIGN_OR_RAISE(auto buffer,
                         AllocateBuffer(static_cast<int64_t>(handle_size), pool));

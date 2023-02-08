@@ -132,7 +132,7 @@ if(ARROW_BUILD_STATIC)
   target_link_libraries(plasma-store-server plasma_static ${PLASMA_STATIC_LINK_LIBS})
 else()
   # Fallback to shared libs in the case that static libraries are not build.
-  target_link_libraries(plasma-store-server plasma_shared ${PLASMA_LINK_LIBS} cudart)
+  target_link_libraries(plasma-store-server plasma_shared ${PLASMA_LINK_LIBS})
 endif()
 target_link_libraries(plasma-store-server ${GFLAGS_LIBRARIES})
 target_compile_definitions(plasma-store-server PRIVATE _PLASMA_NO_DEPRECATE)
