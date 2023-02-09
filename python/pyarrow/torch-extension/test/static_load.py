@@ -90,9 +90,14 @@ def createModel(model_name):
     from timm import create_model
     return create_model(model_name, pretrained=True)
 
+def checkLazyMode():
+    from cuda import cuda
+    print(cuda.cuModuleGetLoadingMode())
+
 if __name__ == "__main__":
     initFramework()
-    model_list = ["resnet152", "convnext_xlarge_in22k", "vit_huge_patch14_224_in21k"]
-    model = createModel(model_list[2])
-    checkModel(model,shared=True)
+    model_list = ["resnet50", "resnet152", "convnext_xlarge_in22k", "vit_huge_patch14_224_in21k"]
+    model = createModel(model_list[0])
+    checkModel(model,shared=False)
+    checkLazyMode()
     time.sleep(100)
