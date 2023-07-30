@@ -176,7 +176,7 @@ RUN pip install \
     -r arrow/python/requirements-build.txt
 
 RUN /bin/bash -c "/arrow/ci/scripts/python_build.sh /arrow /build"
-RUN pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu118 
+RUN pip3 install torch==1.13.0 torchvision==0.14.0 torchaudio==0.13.0 --extra-index-url https://download.pytorch.org/whl/cu117 
 RUN cd /arrow/python/pyarrow/torch-extension/tensorstore/ && python setup.py install && pip3 install timm cuda-python
 
 CMD /bin/bash -c "sleep infinity"

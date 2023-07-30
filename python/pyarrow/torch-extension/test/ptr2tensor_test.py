@@ -28,5 +28,3 @@ def getObj(obj_id):
 getObj(obj_id)
 getObj(obj_id)
 getObj(obj_id)
-import time
-time.sleep(100000)
